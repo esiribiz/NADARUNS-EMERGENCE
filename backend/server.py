@@ -86,10 +86,45 @@ class Order(BaseModel):
     dropoff_otp: str = ""
     pickup_otp_verified: bool = False
     dropoff_otp_verified: bool = False
+    proof_photo: Optional[str] = None  # base64 data URL
+    business_id: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     completed_at: Optional[str] = None
     rating_given: Optional[int] = None  # thumbs up/down: 1 or -1
     feedback: Optional[str] = None
+
+
+class ProofUpload(BaseModel):
+    proof_photo: str  # base64 data URL
+
+
+class Business(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    contact_name: str
+    email: str
+    phone: str
+    avatar: str
+    address: str
+    total_shipments: int = 0
+    monthly_volume: float = 0.0
+
+
+class CreateShipmentRequest(BaseModel):
+    pickup_name: str
+    pickup_address: str
+    pickup_lat: float
+    pickup_lng: float
+    dropoff_name: str
+    dropoff_address: str
+    dropoff_lat: float
+    dropoff_lng: float
+    customer_name: str
+    customer_phone: str
+    customer_apartment: Optional[str] = ""
+    customer_notes: Optional[str] = ""
+    items: List[OrderItem]
+    priority: Literal["standard", "express"] = "standard"
 
 
 class OtpRequest(BaseModel):
@@ -265,6 +300,21 @@ def build_order(status: OrderStatus = "pending", completed_offset_hours: Optiona
     return order
 
 
+BUSINESS_ID = "business-001"
+
+SEED_BUSINESS = {
+    "id": BUSINESS_ID,
+    "name": "Nordic Bowl AB",
+    "contact_name": "Sara Ek",
+    "email": "ops@nordicbowl.se",
+    "phone": "+46 70 998 1122",
+    "avatar": "https://images.unsplash.com/photo-1554118811-1e0d58224f24?crop=entropy&cs=srgb&fm=jpg&w=400&q=80",
+    "address": "12 Hamngatan, Stockholm",
+    "total_shipments": 0,
+    "monthly_volume": 0.0,
+}
+
+
 async def ensure_seed():
     driver = await db.drivers.find_one({"id": DRIVER_ID}, {"_id": 0})
     if not driver:
@@ -303,6 +353,11 @@ async def ensure_seed():
         for i in range(8):
             await db.orders.insert_one(build_order("delivered", completed_offset_hours=i * 6 + random.randint(1, 5)))
         logger.info("Seeded delivery history")
+
+    business = await db.businesses.find_one({"id": BUSINESS_ID}, {"_id": 0})
+    if not business:
+        await db.businesses.insert_one(SEED_BUSINESS.copy())
+        logger.info("Seeded business")
 
 
 # ===================== Routes =====================
@@ -484,6 +539,88 @@ async def get_wallet():
         next_payout_date=next_payout,
         transactions=[WalletTransaction(**t) for t in txns],
     )
+
+
+@api_router.post("/orders/{order_id}/proof", response_model=Order)
+async def upload_proof(order_id: str, body: ProofUpload):
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    await db.orders.update_one({"id": order_id}, {"$set": {"proof_photo": body.proof_photo}})
+    order["proof_photo"] = body.proof_photo
+    return Order(**order)
+
+
+# ===================== Business / Shipper =====================
+
+@api_router.get("/business/me", response_model=Business)
+async def get_business():
+    biz = await db.businesses.find_one({"id": BUSINESS_ID}, {"_id": 0})
+    if not biz:
+        await ensure_seed()
+        biz = await db.businesses.find_one({"id": BUSINESS_ID}, {"_id": 0})
+    # refresh derived stats
+    total = await db.orders.count_documents({"business_id": BUSINESS_ID})
+    biz["total_shipments"] = total
+    return Business(**biz)
+
+
+@api_router.get("/business/shipments", response_model=List[Order])
+async def list_shipments():
+    cursor = db.orders.find({"business_id": BUSINESS_ID}, {"_id": 0}).sort("created_at", -1).limit(60)
+    items = await cursor.to_list(60)
+    return [Order(**o) for o in items]
+
+
+@api_router.post("/business/shipments", response_model=Order)
+async def create_shipment(req: CreateShipmentRequest):
+    import math
+    distance = round(
+        2 * 6371.0 * math.asin(math.sqrt(
+            math.sin(math.radians(req.dropoff_lat - req.pickup_lat) / 2) ** 2
+            + math.cos(math.radians(req.pickup_lat)) * math.cos(math.radians(req.dropoff_lat))
+            * math.sin(math.radians(req.dropoff_lng - req.pickup_lng) / 2) ** 2
+        )), 2,
+    )
+    distance = max(distance, 0.5)
+    eta = int(distance * 4) + (5 if req.priority == "express" else 10)
+    base = 6.0 + distance * 2.4
+    if req.priority == "express":
+        base *= 1.5
+    earnings = round(base, 2)
+
+    order = Order(
+        order_number=f"#{random.choice(['B','N','S'])}{random.randint(100,999)}{random.choice(['X','Y','Z'])}",
+        status="pending",
+        pickup=GeoPoint(lat=req.pickup_lat, lng=req.pickup_lng, address=req.pickup_address, name=req.pickup_name),
+        dropoff=GeoPoint(lat=req.dropoff_lat, lng=req.dropoff_lng, address=req.dropoff_address, name=req.customer_name),
+        customer=Customer(
+            name=req.customer_name,
+            rating=4.7,
+            phone=req.customer_phone,
+            apartment=req.customer_apartment,
+            gate_code=str(random.randint(1000, 9999)),
+            notes=req.customer_notes,
+        ),
+        items=req.items,
+        distance_km=distance,
+        eta_minutes=eta,
+        earnings=earnings,
+        tip=0.0,
+        pickup_otp=f"{random.randint(1000, 9999)}",
+        dropoff_otp=f"{random.randint(1000, 9999)}",
+        business_id=BUSINESS_ID,
+    ).model_dump()
+    await db.orders.insert_one(order.copy())
+    return Order(**order)
+
+
+@api_router.get("/business/shipments/{order_id}", response_model=Order)
+async def get_shipment(order_id: str):
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Shipment not found")
+    return Order(**order)
 
 
 @api_router.post("/orders/seed-new-pending", response_model=Order)

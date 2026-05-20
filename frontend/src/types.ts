@@ -48,6 +48,8 @@ export interface Order {
   dropoff_otp: string;
   pickup_otp_verified: boolean;
   dropoff_otp_verified: boolean;
+  proof_photo?: string | null;
+  business_id?: string | null;
   created_at: string;
   completed_at?: string | null;
   rating_given?: number | null;
@@ -68,6 +70,35 @@ export interface Wallet {
   payout_schedule: string;
   next_payout_date: string;
   transactions: WalletTransaction[];
+}
+
+export interface Business {
+  id: string;
+  name: string;
+  contact_name: string;
+  email: string;
+  phone: string;
+  avatar: string;
+  address: string;
+  total_shipments: number;
+  monthly_volume: number;
+}
+
+export interface CreateShipmentRequest {
+  pickup_name: string;
+  pickup_address: string;
+  pickup_lat: number;
+  pickup_lng: number;
+  dropoff_name: string;
+  dropoff_address: string;
+  dropoff_lat: number;
+  dropoff_lng: number;
+  customer_name: string;
+  customer_phone: string;
+  customer_apartment?: string;
+  customer_notes?: string;
+  items: OrderItem[];
+  priority: "standard" | "express";
 }
 
 export interface NotificationPrefs {

@@ -17,6 +17,8 @@ import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 
 import { api } from "../src/api";
+import { clearRole, setRole } from "../src/role";
+import { useTheme } from "../src/ThemeContext";
 import type { Driver, NotificationPrefs } from "../src/types";
 import { radius, shadows, spacing, theme } from "../src/theme";
 
@@ -30,6 +32,7 @@ const VEHICLE_OPTIONS: Array<{ id: string; label: string; icon: keyof typeof Ion
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { mode, setMode, effective } = useTheme();
   const [driver, setDriver] = useState<Driver | null>(null);
   const [name, setName] = useState("");
   const [plate, setPlate] = useState("");
@@ -231,6 +234,56 @@ export default function SettingsScreen() {
           />
         </Animated.View>
 
+        {/* Appearance */}
+        <SectionTitle title="Appearance" />
+        <Animated.View entering={FadeInUp.delay(290)} style={[styles.card, shadows.sm]}>
+          <View style={styles.row}>
+            <Ionicons name={effective === "dark" ? "moon" : "sunny"} size={20} color={theme.textSecondary} />
+            <Text style={[styles.rowLabel, { flex: 1, marginLeft: 12, fontSize: 15, color: theme.textPrimary }]}>
+              Dark mode
+            </Text>
+            <View style={styles.themeSelector}>
+              {(["light", "system", "dark"] as const).map((m) => (
+                <TouchableOpacity
+                  key={m}
+                  onPress={() => { Haptics.selectionAsync().catch(() => {}); setMode(m); }}
+                  style={[styles.themeOpt, mode === m && styles.themeOptSel]}
+                  testID={`theme-${m}`}
+                >
+                  <Text style={[styles.themeOptText, mode === m && { color: "#fff" }]}>
+                    {m === "light" ? "Light" : m === "dark" ? "Dark" : "Auto"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* Role */}
+        <SectionTitle title="Account type" />
+        <Animated.View entering={FadeInUp.delay(310)} style={[styles.card, shadows.sm]}>
+          <TouchableOpacity
+            style={styles.row}
+            onPress={async () => {
+              Haptics.selectionAsync().catch(() => {});
+              await setRole("business");
+              router.replace("/business");
+            }}
+            testID="switch-role-business"
+          >
+            <Ionicons name="briefcase-outline" size={20} color={theme.textSecondary} />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={[styles.rowLabel, { fontSize: 15, color: theme.textPrimary, fontWeight: "700", textTransform: "none", letterSpacing: 0 }]}>
+                Switch to Shipper mode
+              </Text>
+              <Text style={{ fontSize: 12, color: theme.textSecondary, marginTop: 2 }}>
+                Send packages and track shipments
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+          </TouchableOpacity>
+        </Animated.View>
+
         {/* Payouts & Support */}
         <SectionTitle title="More" />
         <Animated.View entering={FadeInUp.delay(320)} style={[styles.card, shadows.sm]}>
@@ -247,7 +300,11 @@ export default function SettingsScreen() {
         <TouchableOpacity
           style={[styles.signOutBtn, shadows.sm]}
           testID="sign-out-button"
-          onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {})}
+          onPress={async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+            await clearRole();
+            router.replace("/welcome");
+          }}
         >
           <Ionicons name="log-out-outline" size={20} color={theme.error} />
           <Text style={styles.signOutText}>Sign out</Text>
@@ -367,4 +424,8 @@ const styles = StyleSheet.create({
   signOutBtn: { marginTop: spacing.xxl, flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: theme.surface, paddingVertical: 16, borderRadius: radius.lg, gap: 8 },
   signOutText: { color: theme.error, fontWeight: "700", fontSize: 16 },
   versionText: { textAlign: "center", color: theme.textSecondary, fontSize: 12, marginTop: spacing.xl },
+  themeSelector: { flexDirection: "row", backgroundColor: theme.surfaceMuted, borderRadius: radius.pill, padding: 3 },
+  themeOpt: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill },
+  themeOptSel: { backgroundColor: theme.primary },
+  themeOptText: { fontSize: 12, fontWeight: "700", color: theme.textPrimary },
 });

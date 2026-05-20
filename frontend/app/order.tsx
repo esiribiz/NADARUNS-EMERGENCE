@@ -19,6 +19,7 @@ import { radius, shadows, spacing, theme } from "../src/theme";
 import MapView from "../src/components/MapView";
 import SwipeToConfirm from "../src/components/SwipeToConfirm";
 import OtpModal from "../src/components/OtpModal";
+import PhotoProofModal from "../src/components/PhotoProofModal";
 
 const STAGE_TITLES: Record<OrderStatus, { title: string; subtitle: string; primary: string }> = {
   pending: { title: "New request", subtitle: "Reviewing order details", primary: "Continue" },
@@ -41,6 +42,7 @@ export default function OrderFlowScreen() {
   const [routePoints, setRoutePoints] = useState<RoutePoint[]>([]);
   const [otpOpen, setOtpOpen] = useState<null | "pickup" | "dropoff">(null);
   const [otpError, setOtpError] = useState<string | null>(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -239,6 +241,20 @@ export default function OrderFlowScreen() {
           </Animated.View>
         ) : null}
 
+        {/* Photo proof button visible at dropoff */}
+        {order.status === "arrived_dropoff" ? (
+          <TouchableOpacity
+            style={[styles.proofBtn, order.proof_photo ? { borderColor: theme.success, backgroundColor: `${theme.success}11` } : null]}
+            onPress={() => setPhotoOpen(true)}
+            testID="open-photo-proof-button"
+          >
+            <Ionicons name={order.proof_photo ? "checkmark-circle" : "camera-outline"} size={20} color={order.proof_photo ? theme.success : theme.primary} />
+            <Text style={[styles.proofBtnText, { color: order.proof_photo ? theme.success : theme.primary }]}>
+              {order.proof_photo ? "Proof photo captured" : "Add delivery proof photo"}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
         {/* Action */}
         {(order.status === "arrived_pickup" || order.status === "arrived_dropoff") ? (
           <SwipeToConfirm
@@ -301,12 +317,23 @@ export default function OrderFlowScreen() {
             setOrder(updated);
             setOtpOpen(null);
             setOtpError(null);
-            // After successful OTP verify, automatically advance to next stage
             await advance();
           } catch (e: any) {
             setOtpError("Incorrect code. Please try again.");
             throw e;
           }
+        }}
+      />
+
+      <PhotoProofModal
+        visible={photoOpen}
+        onClose={() => setPhotoOpen(false)}
+        onCaptured={async (dataUrl) => {
+          const updated = await api.uploadProof(order.id, dataUrl);
+          setOrder(updated);
+          setPhotoOpen(false);
+          // Auto-advance to delivered after proof captured
+          await advance();
         }}
       />
     </View>
@@ -366,6 +393,8 @@ const styles = StyleSheet.create({
   notesText: { fontSize: 12, color: theme.textPrimary, flex: 1 },
   primaryBtn: { height: 60, backgroundColor: theme.primary, borderRadius: radius.lg, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   primaryBtnText: { color: "#fff", fontWeight: "800", fontSize: 17 },
+  proofBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: radius.lg, borderWidth: 1.5, borderColor: theme.primary, marginBottom: spacing.md, backgroundColor: "rgba(20, 123, 109, 0.06)" },
+  proofBtnText: { fontWeight: "700", fontSize: 14 },
   contactRow: { flexDirection: "row", justifyContent: "space-around", marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: theme.border },
   contactBtn: { alignItems: "center", gap: 4, paddingHorizontal: 16, paddingVertical: 4 },
   contactText: { fontSize: 11, fontWeight: "600", color: theme.textSecondary },

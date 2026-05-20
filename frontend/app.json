@@ -13,6 +13,10 @@
       "bundleIdentifier": "com.emergent.driverapp",
       "config": {
         "googleMapsApiKey": "AIzaSyCm_A2yMaW6HF-PTFnu-AuSvkWLCJMHtyM"
+      },
+      "infoPlist": {
+        "NSCameraUsageDescription": "Capture delivery proof photos",
+        "NSPhotoLibraryUsageDescription": "Attach photos as delivery proof"
       }
     },
     "android": {
@@ -22,6 +26,7 @@
         "backgroundColor": "#000"
       },
       "edgeToEdgeEnabled": true,
+      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE"],
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCm_A2yMaW6HF-PTFnu-AuSvkWLCJMHtyM"

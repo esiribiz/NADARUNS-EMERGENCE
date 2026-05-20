@@ -6,16 +6,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import { View, ActivityIndicator } from "react-native";
 import { theme } from "../src/theme";
+import { ThemeProvider, useTheme } from "../src/ThemeContext";
+
+function StatusBarThemed() {
+  const { effective } = useTheme();
+  return <StatusBar style={effective === "dark" ? "light" : "dark"} />;
+}
 
 export default function RootLayout() {
-  // Explicitly preload Ionicons font to avoid Expo Go race condition
-  // ("Font file for ionicons is empty" CodedError on cold start over tunnel)
-  const [fontsLoaded, fontError] = useFonts({
-    ...Ionicons.font,
-  });
+  const [fontsLoaded, fontError] = useFonts({ ...Ionicons.font });
 
-  // Render anyway after font attempt — if it fails, icons will fall back
-  // to whatever the system can render rather than blocking the whole app.
   if (!fontsLoaded && !fontError) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: theme.background }}>
@@ -26,16 +26,18 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.background }}>
-      <SafeAreaProvider>
-        <StatusBar style="dark" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: theme.background },
-            animation: "fade",
-          }}
-        />
-      </SafeAreaProvider>
+      <ThemeProvider>
+        <SafeAreaProvider>
+          <StatusBarThemed />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: theme.background },
+              animation: "fade",
+            }}
+          />
+        </SafeAreaProvider>
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }

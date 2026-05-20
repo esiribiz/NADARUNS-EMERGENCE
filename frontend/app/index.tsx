@@ -16,6 +16,7 @@ import Animated, { FadeIn, FadeInDown, FadeInUp, SlideInDown } from "react-nativ
 import * as Haptics from "expo-haptics";
 
 import { api } from "../src/api";
+import { getRole } from "../src/role";
 import type { Driver, Order } from "../src/types";
 import { radius, shadows, spacing, theme } from "../src/theme";
 import MapView from "../src/components/MapView";
@@ -31,6 +32,10 @@ export default function HomeScreen() {
 
   const load = useCallback(async () => {
     try {
+      // Role-gate: if no role chosen yet, go to welcome; if business, go to business home
+      const role = await getRole();
+      if (!role) { router.replace("/welcome"); return; }
+      if (role === "business") { router.replace("/business"); return; }
       const [d, p, a] = await Promise.all([api.getDriver(), api.getPending(), api.getActive()]);
       setDriver(d);
       setPending(p);
@@ -40,7 +45,7 @@ export default function HomeScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [router]);
 
   useFocusEffect(
     useCallback(() => {

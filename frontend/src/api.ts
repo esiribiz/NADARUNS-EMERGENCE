@@ -1,4 +1,4 @@
-import type { DirectionsResponse, Driver, DriverUpdate, Order, Wallet } from "./types";
+import type { Business, CreateShipmentRequest, DirectionsResponse, Driver, DriverUpdate, Order, Wallet } from "./types";
 
 const BASE = process.env.EXPO_PUBLIC_BACKEND_URL;
 
@@ -43,4 +43,11 @@ export const api = {
       body: JSON.stringify({ otp, kind }),
     }),
   getWallet: () => request<Wallet>("/driver/wallet"),
+  uploadProof: (orderId: string, photo: string) =>
+    request<Order>(`/orders/${orderId}/proof`, { method: "POST", body: JSON.stringify({ proof_photo: photo }) }),
+  getBusiness: () => request<Business>("/business/me"),
+  listShipments: () => request<Order[]>("/business/shipments"),
+  createShipment: (req: CreateShipmentRequest) =>
+    request<Order>("/business/shipments", { method: "POST", body: JSON.stringify(req) }),
+  getShipment: (id: string) => request<Order>(`/business/shipments/${id}`),
 };
