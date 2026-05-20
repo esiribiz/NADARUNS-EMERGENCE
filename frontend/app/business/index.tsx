@@ -62,7 +62,7 @@ export default function BusinessHome() {
         </TouchableOpacity>
       </Animated.View>
 
-      <Animated.View entering={FadeInUp.delay(100)} style={[styles.statsCard, shadows.md, { backgroundColor: colors.primary }]}>
+      <Animated.View entering={FadeInUp.delay(100)} style={[styles.statsCard, shadows.md, { backgroundColor: colors.primary }]} testID="statsCard">
         <View style={styles.statBlock}>
           <Text style={styles.statValue}>{biz.total_shipments}</Text>
           <Text style={styles.statLabel}>Total shipments</Text>
