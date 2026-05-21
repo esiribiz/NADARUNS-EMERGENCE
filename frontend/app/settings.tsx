@@ -22,7 +22,7 @@ import { useTheme } from "../src/ThemeContext";
 import type { Driver, NotificationPrefs } from "../src/types";
 import { radius, shadows, spacing, theme } from "../src/theme";
 
-const VEHICLE_OPTIONS: Array<{ id: string; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
+const VEHICLE_OPTIONS: { id: string; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { id: "bicycle", label: "Bicycle", icon: "bicycle-outline" },
   { id: "scooter", label: "Scooter", icon: "rocket-outline" },
   { id: "motorbike", label: "Motorbike", icon: "speedometer-outline" },

@@ -85,7 +85,7 @@ export default function SummaryScreen() {
         Delivery complete
       </Animated.Text>
       <Animated.Text entering={FadeInUp.delay(180)} style={styles.subtitle}>
-        Great work, {order.customer.name.split(" ")[0]}'s order was delivered safely
+        {`Great work, ${order.customer.name.split(" ")[0]}'s order was delivered safely`}
       </Animated.Text>
 
       <Animated.View entering={FadeInUp.delay(240)} style={[styles.earnCard, shadows.lg]}>

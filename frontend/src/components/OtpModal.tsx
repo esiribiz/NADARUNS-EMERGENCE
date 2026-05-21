@@ -30,7 +30,7 @@ const OTP_LENGTH = 4;
 export default function OtpModal({ visible, kind, expectedHint, onClose, onSubmit, error }: Props) {
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(""));
   const [submitting, setSubmitting] = useState(false);
-  const inputs = useRef<Array<TextInput | null>>([]);
+  const inputs = useRef<(TextInput | null)[]>([]);
 
   useEffect(() => {
     if (visible) {
@@ -70,7 +70,7 @@ export default function OtpModal({ visible, kind, expectedHint, onClose, onSubmi
     Keyboard.dismiss();
     try {
       await onSubmit(otp);
-    } catch (e) {
+    } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       setDigits(Array(OTP_LENGTH).fill(""));
       setTimeout(() => inputs.current[0]?.focus(), 50);

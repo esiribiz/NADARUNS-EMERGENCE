@@ -103,7 +103,6 @@ export default function OrderFlowScreen() {
   const stage = STAGE_TITLES[order.status];
   const isNavStage = order.status === "enroute_pickup" || order.status === "enroute_dropoff";
   const isArrivedStage = order.status === "arrived_pickup" || order.status === "arrived_dropoff";
-  const isPickupConfirm = order.status === "picked_up"; // After "arrived_pickup -> picked_up", swipe sets up the dropoff nav
   const targetIsPickup = ["accepted", "enroute_pickup", "arrived_pickup"].includes(order.status);
 
   return (

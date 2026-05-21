@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { theme } from "../theme";
@@ -31,13 +31,22 @@ export default function NativeMapView({
 }: Props) {
   const mapRef = useRef<MapView | null>(null);
 
-  const toLatLng = (p?: Point | null) =>
-    p ? { latitude: p.lat, longitude: p.lng } : null;
-
-  const pickupLL = toLatLng(pickup);
-  const dropoffLL = toLatLng(dropoff);
-  const driverLL = toLatLng(driver) || pickupLL;
-  const routeLL = (routePoints || []).map((p) => ({ latitude: p.lat, longitude: p.lng }));
+  const pickupLL = useMemo(
+    () => (pickup ? { latitude: pickup.lat, longitude: pickup.lng } : null),
+    [pickup?.lat, pickup?.lng]
+  );
+  const dropoffLL = useMemo(
+    () => (dropoff ? { latitude: dropoff.lat, longitude: dropoff.lng } : null),
+    [dropoff?.lat, dropoff?.lng]
+  );
+  const driverLL = useMemo(
+    () => (driver ? { latitude: driver.lat, longitude: driver.lng } : null) || pickupLL,
+    [driver?.lat, driver?.lng, pickupLL]
+  );
+  const routeLL = useMemo(
+    () => (routePoints || []).map((p) => ({ latitude: p.lat, longitude: p.lng })),
+    [routePoints]
+  );
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -49,7 +58,7 @@ export default function NativeMapView({
         animated: true,
       });
     }, 400);
-  }, [pickup?.lat, pickup?.lng, dropoff?.lat, dropoff?.lng, routePoints?.length]);
+  }, [pickupLL, dropoffLL, routeLL]);
 
   const initialRegion = pickupLL
     ? { latitude: pickupLL.latitude, longitude: pickupLL.longitude, latitudeDelta: 0.05, longitudeDelta: 0.05 }

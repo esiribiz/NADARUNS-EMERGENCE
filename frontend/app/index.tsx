@@ -178,7 +178,7 @@ export default function HomeScreen() {
                 <Text style={styles.statValue} testID="earnings-today">
                   ${driver.earnings_today.toFixed(2)}
                 </Text>
-                <Text style={styles.statLabel}>Today's earnings</Text>
+                <Text style={styles.statLabel}>Today’s earnings</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statBox}>

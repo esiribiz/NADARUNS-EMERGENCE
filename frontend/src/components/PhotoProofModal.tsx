@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ActivityIndicator, Image, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import Animated, { FadeIn, SlideInDown } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
@@ -82,7 +82,7 @@ export default function PhotoProofModal({ visible, onClose, onCaptured }: Props)
             </View>
             <Text style={[styles.title, { color: colors.textPrimary }]}>Capture delivery proof</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Snap a photo of the package at the customer's door for safe handoff
+              Snap a photo of the package at the customer’s door for safe handoff
             </Text>
 
             {preview ? (
