@@ -359,6 +359,9 @@ async def ensure_seed():
         await db.businesses.insert_one(SEED_BUSINESS.copy())
         logger.info("Seeded business")
 
+    # Ensure extra demo drivers exist for the admin dashboard
+    await ensure_extra_drivers()
+
 
 # ===================== Routes =====================
 
@@ -630,6 +633,121 @@ async def seed_new_pending():
     new_order = build_order("pending")
     await db.orders.insert_one(new_order.copy())
     return Order(**new_order)
+
+
+# ===================== Admin =====================
+
+ADMIN_SEED_DRIVERS = [
+    {"id": "driver-002", "name": "Mia Holm", "rating": 4.87, "avatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?crop=entropy&cs=srgb&fm=jpg&w=400&q=80", "vehicle": "Scooter • Black", "vehicle_type": "scooter", "plate": "STO-9921", "email": "mia@drv.app", "phone": "+46 70 100 0001", "kyc_status": "pending", "is_online": False, "earnings_today": 0, "deliveries_today": 0, "acceptance_rate": 92, "lat": 59.3370, "lng": 18.0620, "notifications": {"push": True, "sound": True, "new_orders": True, "earnings_summary": True}},
+    {"id": "driver-003", "name": "Jonas Berg", "rating": 4.71, "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?crop=entropy&cs=srgb&fm=jpg&w=400&q=80", "vehicle": "Bicycle • Green", "vehicle_type": "bicycle", "plate": "—", "email": "jonas@drv.app", "phone": "+46 70 100 0002", "kyc_status": "pending", "is_online": False, "earnings_today": 0, "deliveries_today": 0, "acceptance_rate": 88, "lat": 59.3315, "lng": 18.0720, "notifications": {"push": True, "sound": True, "new_orders": True, "earnings_summary": True}},
+    {"id": "driver-004", "name": "Elin Forsberg", "rating": 4.95, "avatar": "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?crop=entropy&cs=srgb&fm=jpg&w=400&q=80", "vehicle": "Car • White Tesla", "vehicle_type": "car", "plate": "STO-4421", "email": "elin@drv.app", "phone": "+46 70 100 0003", "kyc_status": "approved", "is_online": True, "earnings_today": 142.5, "deliveries_today": 9, "acceptance_rate": 97, "lat": 59.3260, "lng": 18.0700, "notifications": {"push": True, "sound": True, "new_orders": True, "earnings_summary": True}},
+    {"id": "driver-005", "name": "Oscar Lund", "rating": 4.62, "avatar": "https://images.unsplash.com/photo-1633332755192-727a05c4013d?crop=entropy&cs=srgb&fm=jpg&w=400&q=80", "vehicle": "Motorbike • Red Vespa", "vehicle_type": "motorbike", "plate": "STO-7783", "email": "oscar@drv.app", "phone": "+46 70 100 0004", "kyc_status": "approved", "is_online": True, "earnings_today": 88.0, "deliveries_today": 6, "acceptance_rate": 90, "lat": 59.3400, "lng": 18.0660, "notifications": {"push": True, "sound": True, "new_orders": True, "earnings_summary": True}},
+]
+
+
+async def ensure_extra_drivers():
+    for d in ADMIN_SEED_DRIVERS:
+        exists = await db.drivers.find_one({"id": d["id"]}, {"_id": 0})
+        if not exists:
+            await db.drivers.insert_one(d.copy())
+
+
+@api_router.get("/admin/drivers")
+async def admin_list_drivers(status: Optional[str] = None):
+    await ensure_extra_drivers()
+    q: dict = {}
+    if status:
+        q["kyc_status"] = status
+    cursor = db.drivers.find(q, {"_id": 0}).limit(200)
+    items = await cursor.to_list(200)
+    # Ensure kyc_status is always present
+    for i in items:
+        i.setdefault("kyc_status", "approved")
+        i.setdefault("lat", None)
+        i.setdefault("lng", None)
+    return items
+
+
+@api_router.post("/admin/drivers/{driver_id}/approve")
+async def admin_approve_driver(driver_id: str):
+    res = await db.drivers.update_one({"id": driver_id}, {"$set": {"kyc_status": "approved"}})
+    if not res.matched_count:
+        raise HTTPException(404, "Driver not found")
+    d = await db.drivers.find_one({"id": driver_id}, {"_id": 0})
+    return d
+
+
+@api_router.post("/admin/drivers/{driver_id}/reject")
+async def admin_reject_driver(driver_id: str):
+    res = await db.drivers.update_one({"id": driver_id}, {"$set": {"kyc_status": "rejected"}})
+    if not res.matched_count:
+        raise HTTPException(404, "Driver not found")
+    d = await db.drivers.find_one({"id": driver_id}, {"_id": 0})
+    return d
+
+
+@api_router.get("/admin/analytics")
+async def admin_analytics():
+    await ensure_extra_drivers()
+    total_orders = await db.orders.count_documents({})
+    delivered = await db.orders.count_documents({"status": "delivered"})
+    pending_count = await db.orders.count_documents({"status": "pending"})
+    active_count = await db.orders.count_documents({"status": {"$in": ["accepted", "enroute_pickup", "arrived_pickup", "picked_up", "enroute_dropoff", "arrived_dropoff"]}})
+    online_drivers = await db.drivers.count_documents({"is_online": True})
+    total_drivers = await db.drivers.count_documents({})
+    pending_drivers = await db.drivers.count_documents({"kyc_status": "pending"})
+
+    pipeline = [
+        {"$match": {"status": "delivered"}},
+        {"$group": {"_id": None, "earnings": {"$sum": "$earnings"}, "tips": {"$sum": "$tip"}, "distance": {"$sum": "$distance_km"}}},
+    ]
+    agg = await db.orders.aggregate(pipeline).to_list(1)
+    earnings_total = float(agg[0]["earnings"]) if agg else 0.0
+    tips_total = float(agg[0]["tips"]) if agg else 0.0
+    distance_total = float(agg[0]["distance"]) if agg else 0.0
+
+    # Last 7 day deliveries chart
+    now = datetime.now(timezone.utc)
+    daily: List[dict] = []
+    for i in range(6, -1, -1):
+        start = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1)
+        count = await db.orders.count_documents({
+            "status": "delivered",
+            "completed_at": {"$gte": start.isoformat(), "$lt": end.isoformat()},
+        })
+        daily.append({"date": start.date().isoformat(), "count": count})
+
+    return {
+        "total_orders": total_orders,
+        "delivered": delivered,
+        "pending": pending_count,
+        "active": active_count,
+        "online_drivers": online_drivers,
+        "total_drivers": total_drivers,
+        "pending_drivers": pending_drivers,
+        "earnings_total": round(earnings_total, 2),
+        "tips_total": round(tips_total, 2),
+        "distance_total": round(distance_total, 2),
+        "empty_runs_saved": round(distance_total * 0.42, 1),  # mock metric: 42% of km saved
+        "daily_deliveries": daily,
+    }
+
+
+@api_router.get("/admin/live-drivers")
+async def admin_live_drivers():
+    await ensure_extra_drivers()
+    cursor = db.drivers.find({"is_online": True}, {"_id": 0}).limit(50)
+    drivers = await cursor.to_list(50)
+    return [{
+        "id": d["id"],
+        "name": d["name"],
+        "vehicle_type": d.get("vehicle_type", "bicycle"),
+        "lat": d.get("lat", 59.33),
+        "lng": d.get("lng", 18.07),
+        "earnings_today": d.get("earnings_today", 0),
+        "deliveries_today": d.get("deliveries_today", 0),
+    } for d in drivers]
 
 
 # ===================== Driver Update =====================
